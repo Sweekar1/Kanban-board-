@@ -4,7 +4,7 @@ A simple, beautiful Kanban board that works entirely in the browser.
 No accounts, no backend, no Python servers — just open the page and share a **6-digit code**.
 
 **Live demo (GitHub Pages):**  
-`https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/`
+`https://sweekar1.github.io/Kanban-board-/`
 
 ---
 
