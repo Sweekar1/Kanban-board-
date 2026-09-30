@@ -19,7 +19,7 @@
         <span>Spark Kanban</span>
       </div>
       <h1>Join or create a board</h1>
-      <p class="join-sub">Share a 6-digit code to collaborate on the same device.</p>
+      <p class="join-sub">Use a 6-digit code. Link devices for real-time sync across phone &amp; laptop (no server).</p>
 
       <div class="field">
         <label for="userName">Your name</label>
@@ -56,7 +56,9 @@
           <span id="roomCodeDisplay">------</span>
           <button class="icon-btn" id="copyCodeBtn" title="Copy code">⧉</button>
         </div>
+        <span class="peer-status" id="peerStatus" title="Peer connection">○</span>
         <button class="btn primary small" id="newCardBtn">+ New Card</button>
+        <button class="btn outline small" id="linkBtn" title="Link another device">Link</button>
         <button class="icon-btn" id="themeBtn" title="Toggle theme">☾</button>
         <button class="icon-btn" id="leaveBtn" title="Leave board">⎋</button>
       </div>
@@ -82,6 +84,43 @@
       <div class="modal-actions">
         <button class="btn ghost" id="cancelCardBtn">Cancel</button>
         <button class="btn primary" id="saveCardBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- LINK DEVICES MODAL (WebRTC, no server) -->
+  <div class="modal-backdrop hidden" id="linkModal">
+    <div class="modal link-modal">
+      <h2>Link devices</h2>
+      <p class="link-help">Connect phone ↔ laptop with the same board. No server — direct peer connection.</p>
+
+      <div class="link-steps">
+        <button class="btn primary full" id="hostLinkBtn">1. This device creates a link</button>
+        <button class="btn outline full" id="joinLinkBtn">2. Other device pastes the link</button>
+      </div>
+
+      <div id="hostLinkPanel" class="hidden">
+        <p class="link-label">Send this link code to the other device:</p>
+        <textarea id="offerOut" readonly rows="4" class="link-code"></textarea>
+        <button class="btn outline full" id="copyOfferBtn">Copy link code</button>
+        <p class="link-label" style="margin-top:14px">Paste their reply here:</p>
+        <textarea id="answerIn" rows="3" class="link-code" placeholder="Paste reply code…"></textarea>
+        <button class="btn primary full" id="acceptAnswerBtn">Connect</button>
+      </div>
+
+      <div id="guestLinkPanel" class="hidden">
+        <p class="link-label">Paste the link code from the other device:</p>
+        <textarea id="offerIn" rows="4" class="link-code" placeholder="Paste link code…"></textarea>
+        <button class="btn primary full" id="createAnswerBtn">Generate reply</button>
+        <div id="answerOutWrap" class="hidden">
+          <p class="link-label" style="margin-top:14px">Send this reply back:</p>
+          <textarea id="answerOut" readonly rows="3" class="link-code"></textarea>
+          <button class="btn outline full" id="copyAnswerBtn">Copy reply</button>
+        </div>
+      </div>
+
+      <div class="modal-actions" style="margin-top:16px">
+        <button class="btn ghost" id="closeLinkBtn">Close</button>
       </div>
     </div>
   </div>

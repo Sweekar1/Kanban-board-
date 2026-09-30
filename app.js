@@ -1,4 +1,4 @@
-/* ===== Spark Kanban — pure client-side ===== */
+/* ===== Spark Kanban — pure client-side + WebRTC P2P ===== */
 
 const COLUMNS = [
   { id: 'todo',  title: 'To Do',       icon: '★' },
@@ -6,12 +6,19 @@ const COLUMNS = [
   { id: 'done',  title: 'Done',        icon: '✓' }
 ];
 
+const ICE = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
+
 const state = {
   roomCode: null,
   userName: null,
   cards: [],
   editingId: null,
-  channel: null
+  channel: null,
+  // WebRTC
+  pc: null,
+  dc: null,
+  role: null, // 'host' | 'guest'
+  pendingIce: []
 };
 
 /* ---------- Helpers ---------- */
@@ -45,6 +52,15 @@ function initial(name) {
   return (name || '?').charAt(0).toUpperCase();
 }
 
+function setPeerStatus(status) {
+  const el = document.getElementById('peerStatus');
+  if (!el) return;
+  el.className = 'peer-status ' + (status || '');
+  if (status === 'connected') el.textContent = '● linked';
+  else if (status === 'connecting') el.textContent = '◌ linking…';
+  else el.textContent = '○';
+}
+
 /* ---------- Persistence + same-device sync ---------- */
 function save() {
   if (!state.roomCode) return;
@@ -53,6 +69,8 @@ function save() {
   if (state.channel) {
     state.channel.postMessage({ type: 'sync', cards: state.cards });
   }
+  // Broadcast to linked peer (phone/laptop)
+  sendPeer({ type: 'sync', cards: state.cards });
 }
 
 function load(code) {
@@ -74,7 +92,6 @@ function setupChannel(code) {
       render();
     }
   };
-  // fallback for older browsers / private mode quirks
   window.addEventListener('storage', onStorage);
 }
 
@@ -108,6 +125,7 @@ function enterBoard() {
   showBoard();
   render();
   save();
+  setPeerStatus('');
 }
 
 /* ---------- Actions ---------- */
@@ -139,6 +157,7 @@ function joinBoard() {
 }
 
 function leaveBoard() {
+  closePeer();
   if (state.channel) {
     state.channel.close();
     state.channel = null;
@@ -252,7 +271,6 @@ function render() {
 
     const list = colEl.querySelector('.cards');
 
-    // Drop handling
     list.addEventListener('dragover', e => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
@@ -296,7 +314,6 @@ function render() {
     board.appendChild(colEl);
   });
 
-  // Event delegation for buttons inside cards / add buttons
   board.querySelectorAll('.add-card-btn').forEach(btn => {
     btn.addEventListener('click', () => openAdd(btn.dataset.col));
   });
@@ -330,17 +347,211 @@ function toggleTheme() {
   applyTheme(current === 'dark' ? 'light' : 'dark');
 }
 
+/* ---------- WebRTC P2P (no server you run) ---------- */
+function closePeer() {
+  try { state.dc?.close(); } catch {}
+  try { state.pc?.close(); } catch {}
+  state.dc = null;
+  state.pc = null;
+  state.role = null;
+  state.pendingIce = [];
+  setPeerStatus('');
+}
+
+function sendPeer(msg) {
+  if (state.dc && state.dc.readyState === 'open') {
+    try {
+      state.dc.send(JSON.stringify(msg));
+    } catch (e) {
+      console.warn('peer send failed', e);
+    }
+  }
+}
+
+function onPeerMessage(data) {
+  try {
+    const msg = JSON.parse(data);
+    if (msg.type === 'sync' && Array.isArray(msg.cards)) {
+      // Merge by id: newer wins simply by accepting remote full state
+      // (both sides always send full board — last write wins is fine for small boards)
+      state.cards = msg.cards;
+      // persist locally
+      if (state.roomCode) {
+        localStorage.setItem(
+          storageKey(state.roomCode),
+          JSON.stringify({ cards: state.cards, updatedAt: Date.now() })
+        );
+      }
+      render();
+    }
+  } catch (e) {
+    console.warn('bad peer message', e);
+  }
+}
+
+function wireDataChannel(dc) {
+  state.dc = dc;
+  dc.onopen = () => {
+    setPeerStatus('connected');
+    toast('Devices linked — live sync on');
+    // Send current board to the other side
+    sendPeer({ type: 'sync', cards: state.cards });
+    document.getElementById('linkModal').classList.add('hidden');
+  };
+  dc.onclose = () => {
+    setPeerStatus('');
+    toast('Peer disconnected');
+  };
+  dc.onerror = () => setPeerStatus('');
+  dc.onmessage = (e) => onPeerMessage(e.data);
+}
+
+function waitIceGathering(pc) {
+  return new Promise((resolve) => {
+    if (pc.iceGatheringState === 'complete') {
+      resolve();
+      return;
+    }
+    const check = () => {
+      if (pc.iceGatheringState === 'complete') {
+        pc.removeEventListener('icegatheringstatechange', check);
+        resolve();
+      }
+    };
+    pc.addEventListener('icegatheringstatechange', check);
+    // safety timeout
+    setTimeout(resolve, 3000);
+  });
+}
+
+function encodeSignal(obj) {
+  return btoa(unescape(encodeURIComponent(JSON.stringify(obj))));
+}
+
+function decodeSignal(str) {
+  return JSON.parse(decodeURIComponent(escape(atob(str.trim()))));
+}
+
+async function startAsHost() {
+  closePeer();
+  state.role = 'host';
+  setPeerStatus('connecting');
+
+  const pc = new RTCPeerConnection(ICE);
+  state.pc = pc;
+
+  const dc = pc.createDataChannel('kanban');
+  wireDataChannel(dc);
+
+  pc.onicecandidate = () => {}; // we wait for complete gathering
+
+  const offer = await pc.createOffer();
+  await pc.setLocalDescription(offer);
+  await waitIceGathering(pc);
+
+  const payload = {
+    sdp: pc.localDescription,
+    room: state.roomCode,
+    name: state.userName
+  };
+
+  document.getElementById('hostLinkPanel').classList.remove('hidden');
+  document.getElementById('guestLinkPanel').classList.add('hidden');
+  document.getElementById('offerOut').value = encodeSignal(payload);
+  document.getElementById('answerIn').value = '';
+}
+
+async function acceptAnswer() {
+  const raw = document.getElementById('answerIn').value.trim();
+  if (!raw || !state.pc) {
+    toast('Paste the reply code first');
+    return;
+  }
+  try {
+    const data = decodeSignal(raw);
+    await state.pc.setRemoteDescription(data.sdp);
+    toast('Connecting…');
+  } catch (e) {
+    console.error(e);
+    toast('Invalid reply code');
+  }
+}
+
+async function startAsGuest() {
+  document.getElementById('guestLinkPanel').classList.remove('hidden');
+  document.getElementById('hostLinkPanel').classList.add('hidden');
+  document.getElementById('answerOutWrap').classList.add('hidden');
+  document.getElementById('offerIn').value = '';
+  document.getElementById('answerOut').value = '';
+}
+
+async function createAnswerFromOffer() {
+  const raw = document.getElementById('offerIn').value.trim();
+  if (!raw) {
+    toast('Paste the link code first');
+    return;
+  }
+
+  let data;
+  try {
+    data = decodeSignal(raw);
+  } catch {
+    toast('Invalid link code');
+    return;
+  }
+
+  // Optional: warn if room codes differ
+  if (data.room && state.roomCode && data.room !== state.roomCode) {
+    if (!confirm('This link is for board ' + data.room + '. You are on ' + state.roomCode + '. Continue anyway?')) {
+      return;
+    }
+  }
+
+  closePeer();
+  state.role = 'guest';
+  setPeerStatus('connecting');
+
+  const pc = new RTCPeerConnection(ICE);
+  state.pc = pc;
+
+  pc.ondatachannel = (e) => {
+    wireDataChannel(e.channel);
+  };
+
+  await pc.setRemoteDescription(data.sdp);
+  const answer = await pc.createAnswer();
+  await pc.setLocalDescription(answer);
+  await waitIceGathering(pc);
+
+  const payload = {
+    sdp: pc.localDescription,
+    name: state.userName
+  };
+
+  document.getElementById('answerOut').value = encodeSignal(payload);
+  document.getElementById('answerOutWrap').classList.remove('hidden');
+  toast('Reply ready — send it back');
+}
+
+function openLinkModal() {
+  document.getElementById('linkModal').classList.remove('hidden');
+  document.getElementById('hostLinkPanel').classList.add('hidden');
+  document.getElementById('guestLinkPanel').classList.add('hidden');
+  document.getElementById('answerOutWrap').classList.add('hidden');
+}
+
+function closeLinkModal() {
+  document.getElementById('linkModal').classList.add('hidden');
+}
+
 /* ---------- Init ---------- */
 document.addEventListener('DOMContentLoaded', () => {
-  // Restore theme
   const savedTheme = localStorage.getItem('spark-kanban-theme') || 'light';
   applyTheme(savedTheme);
 
-  // Restore name
   const saved = localStorage.getItem('spark-kanban-name');
   if (saved) document.getElementById('userName').value = saved;
 
-  // Buttons
   document.getElementById('createBtn').addEventListener('click', createBoard);
   document.getElementById('joinBtn').addEventListener('click', joinBoard);
   document.getElementById('copyCodeBtn').addEventListener('click', copyCode);
@@ -351,14 +562,31 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('themeBtn').addEventListener('click', toggleTheme);
   document.getElementById('themeBtnJoin').addEventListener('click', toggleTheme);
 
-  // Code input: digits only
+  // Link devices
+  document.getElementById('linkBtn').addEventListener('click', openLinkModal);
+  document.getElementById('closeLinkBtn').addEventListener('click', closeLinkModal);
+  document.getElementById('hostLinkBtn').addEventListener('click', startAsHost);
+  document.getElementById('joinLinkBtn').addEventListener('click', startAsGuest);
+  document.getElementById('copyOfferBtn').addEventListener('click', () => {
+    const v = document.getElementById('offerOut').value;
+    navigator.clipboard?.writeText(v).then(() => toast('Link code copied')).catch(() => toast('Copy manually'));
+  });
+  document.getElementById('acceptAnswerBtn').addEventListener('click', acceptAnswer);
+  document.getElementById('createAnswerBtn').addEventListener('click', createAnswerFromOffer);
+  document.getElementById('copyAnswerBtn').addEventListener('click', () => {
+    const v = document.getElementById('answerOut').value;
+    navigator.clipboard?.writeText(v).then(() => toast('Reply copied')).catch(() => toast('Copy manually'));
+  });
+
   document.getElementById('joinCode').addEventListener('input', e => {
     e.target.value = e.target.value.replace(/\D/g, '').slice(0, 6);
   });
 
-  // Keyboard
   document.addEventListener('keydown', e => {
-    if (e.key === 'Escape') closeModal();
+    if (e.key === 'Escape') {
+      closeModal();
+      closeLinkModal();
+    }
     if (e.key === 'Enter' && !document.getElementById('cardModal').classList.contains('hidden')) {
       if (e.target.tagName !== 'TEXTAREA') {
         e.preventDefault();
@@ -367,11 +595,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Click backdrop to close modal
   document.getElementById('cardModal').addEventListener('click', e => {
     if (e.target === e.currentTarget) closeModal();
   });
+  document.getElementById('linkModal').addEventListener('click', e => {
+    if (e.target === e.currentTarget) closeLinkModal();
+  });
 
-  // Start on join screen
   showJoin();
 });

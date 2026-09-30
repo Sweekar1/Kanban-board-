@@ -560,3 +560,51 @@ body {
   .board { gap: 14px; }
   .column { min-width: 260px; }
 }
+
+.peer-status {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  padding: 0 4px;
+}
+.peer-status.connected {
+  color: var(--success);
+}
+.peer-status.connecting {
+  color: var(--accent);
+}
+
+.link-modal { max-width: 460px; }
+.link-help {
+  font-size: 0.875rem;
+  color: var(--text-muted);
+  margin-bottom: 16px;
+}
+.link-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+.link-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin-bottom: 6px;
+}
+.link-code {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  font-family: ui-monospace, monospace;
+  font-size: 0.7rem;
+  background: var(--surface-2);
+  color: var(--text);
+  resize: vertical;
+  margin-bottom: 8px;
+  word-break: break-all;
+}
+.link-code:focus {
+  outline: none;
+  border-color: var(--primary);
+}

@@ -1,10 +1,10 @@
-#  Kanban Board
+# Spark Kanban
 
 A simple, beautiful Kanban board that works entirely in the browser.  
 No accounts, no backend, no Python servers — just open the page and share a **6-digit code**.
 
 **Live demo (GitHub Pages):**  
-`https://Sweekar1.github.io/Kanban-board-/`
+`https://YOUR_USERNAME.github.io/YOUR_REPO_NAME/`
 
 ---
 
@@ -84,19 +84,23 @@ All other tabs listening on the same channel name (`spark-482913`) receive the u
 
 **Fallback:** The app also listens to the `storage` event so changes still propagate even if `BroadcastChannel` is unavailable.
 
-### 4. What does *not* sync across devices
+### 4. Multi-device sync (phone ↔ laptop) — WebRTC P2P
 
-Because there is no cloud server:
+Still **no server you run**. Devices connect directly via WebRTC.
 
-| Situation                        | Syncs? |
-|----------------------------------|--------|
-| Multiple tabs on the same PC     | ✅ Yes |
-| Same browser profile, different windows | ✅ Yes |
-| Different computers / phones     | ❌ No  |
-| Different browsers on same PC    | ❌ No  |
+1. Both devices open the site and join the **same 6-digit board code**.
+2. On one device click **Link** → “This device creates a link” → copy the link code.
+3. On the other device click **Link** → “Other device pastes the link” → paste → generate reply → copy reply.
+4. Paste the reply back on the first device → **Connect**.
 
-Each device keeps its own copy of the board under that code.  
-To share progress between devices you would need a backend (or a more complex peer-to-peer setup).
+After that, card changes sync live between the two devices.
+Uses only a public STUN server (`stun.l.google.com`) for connection setup — no account, no backend of yours.
+
+| Situation                     | Syncs? |
+|-------------------------------|--------|
+| Multiple tabs on the same PC  | ✅ Yes (BroadcastChannel) |
+| Phone + laptop after **Link** | ✅ Yes (WebRTC DataChannel) |
+| Without linking               | ❌ Each device has its own copy |
 
 ### 5. Theme & name persistence
 
@@ -120,6 +124,10 @@ These are independent of the board code.
 6. Click **Save**.
 
 After a minute your board will be live at:
+
+```
+https://YOUR_USERNAME.github.io/spark-kanban/
+```
 
 No build tools or Node.js required.
 
