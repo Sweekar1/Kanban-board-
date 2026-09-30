@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Spark Kanban</title>
+  <link rel="stylesheet" href="styles.css" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <!-- JOIN / CREATE SCREEN -->
+  <div id="joinScreen" class="screen">
+    <button class="icon-btn theme-float" id="themeBtnJoin" title="Toggle theme">☾</button>
+    <div class="join-card">
+      <div class="join-logo">
+        <span class="logo-icon">✦</span>
+        <span>Spark Kanban</span>
+      </div>
+      <h1>Join or create a board</h1>
+      <p class="join-sub">Share a 6-digit code to collaborate on the same device.</p>
+
+      <div class="field">
+        <label for="userName">Your name</label>
+        <input type="text" id="userName" placeholder="e.g. Alex" maxlength="20" autocomplete="name" />
+      </div>
+
+      <div class="field">
+        <label for="joinCode">Board code</label>
+        <input type="text" id="joinCode" class="code-field" placeholder="000000" maxlength="6" inputmode="numeric" />
+      </div>
+
+      <button class="btn primary full" id="joinBtn">Join Board</button>
+      <div class="or-line"><span>or</span></div>
+      <button class="btn outline full" id="createBtn">Create New Board</button>
+    </div>
+  </div>
+
+  <!-- BOARD SCREEN -->
+  <div id="boardScreen" class="screen hidden">
+    <header class="topbar">
+      <div class="topbar-left">
+        <span class="logo-icon">✦</span>
+        <span class="brand">Spark Kanban</span>
+      </div>
+      <div class="topbar-center">
+        <span class="project-title" id="projectTitle">My Board</span>
+      </div>
+      <div class="topbar-right">
+        <div class="user-chip">
+          <span class="avatar" id="userAvatar">A</span>
+          <span id="displayName">Alex</span>
+        </div>
+        <div class="code-chip" title="Board code">
+          <span id="roomCodeDisplay">------</span>
+          <button class="icon-btn" id="copyCodeBtn" title="Copy code">⧉</button>
+        </div>
+        <button class="btn primary small" id="newCardBtn">+ New Card</button>
+        <button class="icon-btn" id="themeBtn" title="Toggle theme">☾</button>
+        <button class="icon-btn" id="leaveBtn" title="Leave board">⎋</button>
+      </div>
+    </header>
+
+    <main class="board-wrap">
+      <div class="board" id="board"></div>
+    </main>
+  </div>
+
+  <!-- CARD MODAL -->
+  <div class="modal-backdrop hidden" id="cardModal">
+    <div class="modal">
+      <h2 id="modalTitle">New Card</h2>
+      <div class="field">
+        <label for="cardTitle">Title</label>
+        <input type="text" id="cardTitle" placeholder="What needs to be done?" />
+      </div>
+      <div class="field">
+        <label for="cardNotes">Notes</label>
+        <textarea id="cardNotes" rows="3" placeholder="Optional details..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn ghost" id="cancelCardBtn">Cancel</button>
+        <button class="btn primary" id="saveCardBtn">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>
