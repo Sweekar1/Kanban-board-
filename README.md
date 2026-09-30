@@ -1,4 +1,4 @@
-# Spark Kanban
+#  Kanban Board
 
 A simple, beautiful Kanban board that works entirely in the browser.  
 No accounts, no backend, no Python servers — just open the page and share a **6-digit code**.
